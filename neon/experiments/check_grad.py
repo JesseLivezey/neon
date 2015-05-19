@@ -1,16 +1,5 @@
 # ----------------------------------------------------------------------------
-# Copyright 2014 Nervana Systems Inc.
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Copyright 2014 Nervana Systems Inc.  All rights reserved.
 # ----------------------------------------------------------------------------
 """
 Numerical gradient checking to validate backprop code.
@@ -192,3 +181,106 @@ class GradientChecker(Experiment):
                 result = self.check_layer(layer, inputs, targets)
             if result is False:
                 break
+
+def ExhaustiveGradientChecker(layer, params, updates, in_dim, in_array=None):
+    """
+    Exhaustivly check that the numerical gradients match up with the bprop method
+    for a layer. Should be used with toy layer sizes.
+
+    Parameters
+    ----------
+    layer : layer object
+        Should contain fprop and bprop methods along with output and delta attributes.
+    params : tuple
+        Tuple containing pointers to layer parameter arrays.
+    updates : tuple
+        Tuple containing points to layer parameter updates set by bprop.
+    in_dim : tuple
+        Expected shape for fprop.
+    """
+    deltaX = 1.e-6
+    rng = np.random.RandomState(0) #change this to neon friendly
+    fprop = layer.fprop
+    bprop = layer.bprop
+
+    if in_array is not None:
+        in_center = in_array.copy()
+    else:
+        in_center = rng.randn(in_dim)
+    fprop(in_center)
+    out_center = layer.output.asnumpyarray()
+
+    def num_grad(f_plus, f_minus, deltaX):
+        return (f_plus-f_finus)/(2.*deltaX)
+
+    def check_param(param, update, layer, in_array, out_array):
+        orig_param = param.asnumpyarray()
+        fprop = layer.fprop
+        bprop = layer.bprop
+
+        param_shape = param.shape
+        update_shape = update.shape
+        in_shape = in_array.shape
+        out_shape = out_array.shape
+
+        for ii in xrange(np.prod(param_shape)):
+            for jj in xrange(np.prod(out_shape)):
+                # Pick the jjth delta
+                param[:] = orig_param.copy()
+                layer.fprop(in_array)
+                deltas_in = np.zeros(np.prod(out_shape))
+                delta_in[jj] = 1.
+                delta_in = delta_in.reshape(out_shape)
+                layer.bprop(delta_in)
+                exact = update.asnumpyarray.ravel()[ii]
+                #Vary the iith param
+                flat_param = orig_param.ravel()
+                flat_param[ii] = param[ii]+deltaX
+                param[:] = flat_param.reshape(param_shape)
+                fprop(in_array)
+                fplus = layer.output.ravel()[jj]
+                flat_param[ii] = param[ii]-2.*deltaX
+                param[:] = flat_param.reshape(param_shape)
+                fprop(in_array)
+                fminus = layer.output.ravel()[jj]
+                if not np.allclose(exact, num_grad(fplus, fminus, deltaX)):
+                    raise ValueError('Bad gradient in layer: '+str(layer.name)+'.')
+
+    def check_input(layer, deltas, in_array, out_array):
+        orig_in_array = in_array.asnumpyarray()
+        fprop = layer.fprop
+        bprop = layer.bprop
+
+        param_shape = param.shape
+        update_shape = update.shape
+        in_shape = in_array.shape
+        out_shape = out_array.shape
+
+        for ii in xrange(np.prod(input_shape)):
+            for jj in xrange(np.prod(out_shape)):
+                # Pick the jjth delta
+                layer.fprop(orig_in_array)
+                deltas_in = np.zeros(np.prod(out_shape))
+                delta_in[jj] = 1.
+                delta_in = delta_in.reshape(out_shape)
+                layer.bprop(delta_in)
+                exact = deltas.asnumpyarray.ravel()[ii]
+                #Vary the iith input
+                flat_input = orig_input_array.ravel()
+                flat_input[ii] = flat_input[ii]+deltaX
+                in[:] = flat_input.reshape(in_shape)
+                fprop(in_array)
+                fplus = layer.output.ravel()[jj]
+                flat_input[ii] = input[ii]-2.*deltaX
+                input[:] = flat_input.reshape(in_shape)
+                fprop(in_array)
+                fminus = layer.output.ravel()[jj]
+                if not np.allclose(exact, num_grad(fplus, fminus, deltaX)):
+                    raise ValueError('Bad gradient in layer: '+str(layer.name)+'.')
+
+                
+    match = [check_param(param, update, layer, in_center, out_center)
+             for param, update in zip(params, updates)]
+    deltas_match = check_input(layer, deltas, in_array, out_array)
+    return (all(match) and deltas_match)
+
