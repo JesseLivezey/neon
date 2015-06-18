@@ -182,19 +182,18 @@ class GradientChecker(Experiment):
             if result is False:
                 break
 
-def ExhaustiveGradientChecker(layer):
+def exhaustive_gradient_checker(layer, deltaX=1.e-4, rtol=1.e-2):
     """
     Exhaustivly check that the numerical gradients match up with the bprop method
     for a layer. Should be used with toy layer sizes.
 
-    Parameters
+    Arguments
     ----------
     layer : layer object
         Layer with fprop, bprop, params deltas, and output attributes.
     in_array : array
         Input to layer (optional).
     """
-    deltaX = 1.e-6
     rng = np.random.RandomState(0) #change this to neon friendly
     fprop = layer.fprop
     bprop = layer.bprop
@@ -243,7 +242,7 @@ def ExhaustiveGradientChecker(layer):
                 fprop(in_array)
                 fminus = layer.output.asnumpyarray().ravel()[ii]
                 num = num_grad(fplus, fminus, deltaX)
-                if not np.allclose(exact, num, atol=1.e-3):
+                if not np.allclose(exact, num, rtol=rtol):
                     raise ValueError('Bad gradient in layer: '+str(layer.name)
                             +'. Exact value: '+str(exact)
                             +'. Approximate value: '+str(num)
@@ -280,7 +279,7 @@ def ExhaustiveGradientChecker(layer):
                 fprop(inpt_be)
                 fminus = layer.output.asnumpyarray().ravel()[ii]
                 num = num_grad(fplus, fminus, deltaX)
-                if not np.allclose(exact, num, atol=1.e-3):
+                if not np.allclose(exact, num, rtol=rtol):
                     raise ValueError('Bad gradient in layer: '+str(layer.name)
                             +'. Exact value: '+str(exact)
                             +'. Approximate value: '+str(num)

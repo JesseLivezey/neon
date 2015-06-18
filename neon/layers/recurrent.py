@@ -153,9 +153,9 @@ class RecurrentHiddenLayer(RecurrentLayer):
     """
 
     def initialize(self, kwargs):
+        super(RecurrentHiddenLayer, self).initialize(kwargs)
         req_param(self, ['weight_init_rec'])
         self.weight_rec_shape = (self.nout, self.nout)
-        super(RecurrentHiddenLayer, self).initialize(kwargs)
 
         self.weight_shape = (self.nout, self.nin)
         self.bias_shape = (self.nout, 1)
