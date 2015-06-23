@@ -211,7 +211,7 @@ def exhaustive_gradient_checker(layer, deltaX=1.e-4, rtol=1.e-2):
         return (f_plus-f_minus)/(2.*deltaX)
 
     def check_param(param, update, layer, in_array, out_array):
-        orig_param = param.asnumpyarray()
+        orig_param = np.copy(param.asnumpyarray())
         fprop = layer.fprop
         bprop = layer.bprop
 
@@ -221,7 +221,7 @@ def exhaustive_gradient_checker(layer, deltaX=1.e-4, rtol=1.e-2):
         out_shape = out_array.shape
 
         for ii in xrange(np.prod(out_shape)):
-            param[:] = layer.backend.array(orig_param)
+            param[:] = layer.backend.array(np.copy(orig_param))
             layer.fprop(in_array)
             deltas_in = np.zeros(np.prod(out_shape))
             deltas_in[ii] = 1.
@@ -229,6 +229,7 @@ def exhaustive_gradient_checker(layer, deltaX=1.e-4, rtol=1.e-2):
             layer.bprop(deltas_in)
             exact_update = update.asnumpyarray().ravel()
             for jj in xrange(np.prod(param_shape)):
+                param[:] = layer.backend.array(np.copy(orig_param))
                 # Pick the jjth delta
                 exact = exact_update[jj]
                 # Vary the jjth param
@@ -243,13 +244,14 @@ def exhaustive_gradient_checker(layer, deltaX=1.e-4, rtol=1.e-2):
                 fminus = layer.output.asnumpyarray().ravel()[ii]
                 num = num_grad(fplus, fminus, deltaX)
                 if not np.allclose(exact, num, rtol=rtol):
-                    raise ValueError('Bad gradient in layer: '+str(layer.name)
+                    raise ValueError('Bad parameter gradient in layer: '+str(layer.name)
                             +'. Exact value: '+str(exact)
                             +'. Approximate value: '+str(num)
                             +'. At location '+str(ii)+', '+str(jj)+'.')
+                param[:] = layer.backend.array(orig_param)
 
     def check_input(layer, deltas, in_array, out_array):
-        orig_in_array = in_array.asnumpyarray()
+        orig_in_array = np.copy(in_array.asnumpyarray())
         fprop = layer.fprop
         bprop = layer.bprop
 
@@ -269,7 +271,7 @@ def exhaustive_gradient_checker(layer, deltaX=1.e-4, rtol=1.e-2):
                 # Pick the jjth delta
                 exact = exact_deltas[jj]
                 # Vary the jjth input
-                inpt = orig_in_array.copy().ravel()
+                inpt = np.copy(orig_in_array).ravel()
                 inpt[jj] = inpt[jj]+deltaX
                 inpt_be = layer.backend.array(inpt.reshape(in_shape))
                 fprop(inpt_be)
@@ -280,7 +282,7 @@ def exhaustive_gradient_checker(layer, deltaX=1.e-4, rtol=1.e-2):
                 fminus = layer.output.asnumpyarray().ravel()[ii]
                 num = num_grad(fplus, fminus, deltaX)
                 if not np.allclose(exact, num, rtol=rtol):
-                    raise ValueError('Bad gradient in layer: '+str(layer.name)
+                    raise ValueError('Bad input gradient in layer: '+str(layer.name)
                             +'. Exact value: '+str(exact)
                             +'. Approximate value: '+str(num)
                             +'. At location '+str(ii)+', '+str(jj)+'.')
